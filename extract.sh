@@ -11,6 +11,6 @@ mkdir -p tests
 for file in ./tests_html/*.html; do
 	echo "Running for $file"
 	filename=$(echo "$file" | sed "s/.*\///")
-	output=$(lynx -dump)
+	output=$(lynx -dump $file)
 	echo "$output" >> ./tests/$filename.txt
 done
