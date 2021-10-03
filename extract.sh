@@ -12,5 +12,9 @@ for file in ./tests_html/*.html; do
 	echo "Running for $file"
 	filename=$(echo "$file" | sed "s/.*\///")
 	output=$(lynx -dump $file)
+	output=$(echo "$output" | sed 's/Правильна відповідь:.*/& asdfghjkl/g')
+	output=$(echo "$output" | sed '/Текст питання/!d;s//&\n/;s/.*\n//;:a;/ asdfghjkl/bb;$!{n;ba};:b;s//\n&/;P;D')
+	output=$(echo "$output" | sed 's/\[.[0-9]{1,10}\]//g')
+	output=$(echo "$output" | perl -ne 'print unless /\(\*\)/ ... /Коментар/')
 	echo "$output" >> ./tests/$filename.txt
 done
