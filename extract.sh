@@ -3,7 +3,8 @@
 lynx_exist=$(which lynx)
 if [[ -z "$lynx_exist" ]]; then
 	echo "LYNX is not installed. Please install to proceed with convertation"
-	echo "Debian based: sudo apt-get install lynx"
+	echo "  Debian based: sudo apt install lynx"
+	echo "  Arch based:   sudo pacman -Syu lynx"
 	exit -1
 fi
 
