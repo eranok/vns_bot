@@ -15,6 +15,7 @@ class VnsSession:
     pattern_cmid = 'name="cmid" value="(.*?)"'
     pattern_session= 'name="sesskey" value="(.*?)"'
     pattern_attempt = 'name="attempt" value="(.*?)"'
+    
 
     def __init__(self, login, password):
         self.session = requests.Session()
@@ -30,8 +31,8 @@ class VnsSession:
     def get(self, url, params = None):
         return self.session.get(url, params=params)
 
-    def post(self, url, payload):
-        return self.session.post(url, data=payload)
+    def post(self, url, payload, headers = None):
+        return self.session.post(url, data=payload, headers=headers)
 
     def test_start(self, test_id):
         url_test = "https://vns.lpnu.ua/mod/quiz/view.php?id={}".format(test_id)
@@ -41,7 +42,48 @@ class VnsSession:
 
         payload = {'cmid': self.cmid, 'sesskey': self.sesskey}
         started_test_page = self.post(self.url_test_start, payload)
+        self.test_page = started_test_page
         self.attempt = re.findall(self.pattern_attempt, started_test_page.text)[0]
+
+    def test_process_d(self, answers):
+        answer_input_pattern = 'q\d+'
+        answer_input = re.search(answer_input_pattern, self.test_page.text).group()
+
+        # generating form-data reponse
+        boundary = "--boundary--"
+        content = 'Content-Disposition: form-data; name="{}"'
+
+        payload = ""
+        answer_id = 1
+        slots = ""
+        for answer in answers:
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_flagged") + "\n\n"
+            payload += str(0) + "\n"
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_flagged") + "\n\n"
+            payload += str(0) + "\n"
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_sequancecheck") + "\n\n"
+            payload += str(1) + "\n"
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_answer") + "\n\n"
+            payload += str(answer) + "\n"
+            if slots != "": slots += "," 
+            slots += str(answer_id)
+            answer_id += 1
+        
+        payload += boundary + content.format("attempt") + "\n\n"
+        payload += str(self.attempt) + "\n"
+
+        payload += boundary + content.format("sesskey") + "\n\n"
+        payload += str(self.sesskey) + "\n"
+
+        payload += boundary + content.format("slots") + "\n\n"
+        payload += str(slots) + "\n"
+
+        payload += boundary
+
+        print(payload)
+
+        headers = {"Content-Type": "multipart/form-data; boundary={}".format(boundary)}
+        self.post(self.url_test_process, payload, headers)
 
     def test_process(self):
         # TODO make this method send payload or data with answers
@@ -64,6 +106,7 @@ def main():
     for i in range(times):
         print(f"Progress {i+1} out of {times}")
         s.test_start(test_id)
+        s.test_process_d([1,2,3,4,5,6,7,8,9,0])
         s.test_process()
         r = s.test_review()
         # in r.text you have the whole html page
