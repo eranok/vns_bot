@@ -1,7 +1,9 @@
-import requests
-import subprocess
 import re
 import sys
+import json
+import requests
+import subprocess
+from bs4 import BeautifulSoup
 
 
 class VnsSession:
@@ -42,8 +44,9 @@ class VnsSession:
 
         payload = {'cmid': self.cmid, 'sesskey': self.sesskey}
         started_test_page = self.post(self.url_test_start, payload)
-        self.test_page = started_test_page
+        self.test_page = started_test_page # TODO remove and use ret val
         self.attempt = re.findall(self.pattern_attempt, started_test_page.text)[0]
+        return started_test_page
 
     def test_process_d(self, answers):
         answer_input_pattern = 'q\d+'
@@ -101,18 +104,53 @@ def main():
     test_id = sys.argv[3]
     times = int(sys.argv[4])
     s = VnsSession(login, password)
-    subprocess.run("mkdir -p tests_html", shell=True, check=True)
-    test_results = open(f"./tests_html/{test_id}.html", "a")
+    print("test")
+    if times == -1:
+        r = s.test_start(test_id)
+        questions_raw = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
+        questions = []
+        for i in range(len(questions_raw)):
+            soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
+            question = soup.get_text()
+            questions.append(question)
+
+        exit(0)
+
+
+    subprocess.run("mkdir -p tests", shell=True)
+
+    json_data = []
+    # TODO better check if file exists or something else
+    try:
+        with open(f"./tests/{test_id}.json", "r+") as f:
+             json_data = json.load(f)
+    except FileNotFoundError:
+        pass
+
     for i in range(times):
         print(f"Progress {i+1} out of {times}")
         s.test_start(test_id)
-        s.test_process_d([1,2,3,4,5,6,7,8,9,0])
         s.test_process()
         r = s.test_review()
+        questions = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
+        answers = re.findall(r"Правильна відповідь: (.+?)", r.text)
+        for i in range(len(questions)):
+            soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
+            question = soup.get_text()
+
+            a = {
+                "question": question.replace('\n', ''),
+                "answer": answers[i][0].strip()
+            }
+            json_data.append(a)
+
+
         # in r.text you have the whole html page
         # do whatever you want with it
-        test_results.write(r.text)
-    test_results.close()
+        #test_results.write(r.text)
+    with open(f"./tests/{test_id}.json", "w") as f:
+        json.dump(json_data, f)
+
 
 
 if __name__ == "__main__":
