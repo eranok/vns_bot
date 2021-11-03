@@ -1,8 +1,15 @@
+<<<<<<< HEAD
 #!/bin/python3
 import requests
 import subprocess
+=======
+>>>>>>> better-output-no-extract
 import re
 import sys
+import json
+import requests
+import subprocess
+from bs4 import BeautifulSoup
 
 
 class VnsSession:
@@ -16,6 +23,7 @@ class VnsSession:
     pattern_cmid = 'name="cmid" value="(.*?)"'
     pattern_session= 'name="sesskey" value="(.*?)"'
     pattern_attempt = 'name="attempt" value="(.*?)"'
+    
 
     def __init__(self, login, password):
         self.session = requests.Session()
@@ -31,8 +39,8 @@ class VnsSession:
     def get(self, url, params = None):
         return self.session.get(url, params=params)
 
-    def post(self, url, payload):
-        return self.session.post(url, data=payload)
+    def post(self, url, payload, headers = None):
+        return self.session.post(url, data=payload, headers=headers)
 
     def test_start(self, test_id):
         url_test = "https://vns.lpnu.ua/mod/quiz/view.php?id={}".format(test_id)
@@ -42,7 +50,49 @@ class VnsSession:
 
         payload = {'cmid': self.cmid, 'sesskey': self.sesskey}
         started_test_page = self.post(self.url_test_start, payload)
+        self.test_page = started_test_page # TODO remove and use ret val
         self.attempt = re.findall(self.pattern_attempt, started_test_page.text)[0]
+        return started_test_page
+
+    def test_process_d(self, answers):
+        answer_input_pattern = 'q\d+'
+        answer_input = re.search(answer_input_pattern, self.test_page.text).group()
+
+        # generating form-data reponse
+        boundary = "--boundary--"
+        content = 'Content-Disposition: form-data; name="{}"'
+
+        payload = ""
+        answer_id = 1
+        slots = ""
+        for answer in answers:
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_flagged") + "\n\n"
+            payload += str(0) + "\n"
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_flagged") + "\n\n"
+            payload += str(0) + "\n"
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_sequancecheck") + "\n\n"
+            payload += str(1) + "\n"
+            payload += boundary + "\n" + content.format(answer_input + f":{answer_id}_answer") + "\n\n"
+            payload += str(answer) + "\n"
+            if slots != "": slots += "," 
+            slots += str(answer_id)
+            answer_id += 1
+        
+        payload += boundary + content.format("attempt") + "\n\n"
+        payload += str(self.attempt) + "\n"
+
+        payload += boundary + content.format("sesskey") + "\n\n"
+        payload += str(self.sesskey) + "\n"
+
+        payload += boundary + content.format("slots") + "\n\n"
+        payload += str(slots) + "\n"
+
+        payload += boundary
+
+        print(payload)
+
+        headers = {"Content-Type": "multipart/form-data; boundary={}".format(boundary)}
+        self.post(self.url_test_process, payload, headers)
 
     def test_process(self):
         # TODO make this method send payload or data with answers
@@ -60,17 +110,44 @@ def main():
     test_id = sys.argv[3]
     times = int(sys.argv[4])
     s = VnsSession(login, password)
-    subprocess.run("mkdir -p tests_html", shell=True, check=True)
-    test_results = open(f"./tests_html/{test_id}.html", "a")
+    print("test")
+    if times == -1:
+        r = s.test_start(test_id)
+        questions_raw = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
+        questions = []
+        for i in range(len(questions_raw)):
+            soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
+            question = soup.get_text()
+            questions.append(question)
+
+        exit(0)
+
+
+    subprocess.run("mkdir -p tests", shell=True)
+
+    f = open(f"./tests/{test_id}.txt", "a")
+
     for i in range(times):
         print(f"Progress {i+1} out of {times}")
         s.test_start(test_id)
         s.test_process()
         r = s.test_review()
+        questions = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
+        answers = re.findall(r"Правильна відповідь: (.+?)", r.text)
+        for i in range(len(questions)):
+            soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
+            question = soup.get_text()
+
+            a = "question: " + question.replace("\n", "") + "\n"
+            a += "answer: " + answers[i][0].strip() + "\n\n";
+            f.write(a)
+
+
         # in r.text you have the whole html page
         # do whatever you want with it
-        test_results.write(r.text)
-    test_results.close()
+        #test_results.write(r.text)
+    f.close()
+
 
 
 if __name__ == "__main__":
