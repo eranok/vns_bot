@@ -1,9 +1,4 @@
-<<<<<<< HEAD
 #!/bin/python3
-import requests
-import subprocess
-=======
->>>>>>> better-output-no-extract
 import re
 import sys
 import json
