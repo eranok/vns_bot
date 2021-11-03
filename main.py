@@ -119,13 +119,7 @@ def main():
 
     subprocess.run("mkdir -p tests", shell=True)
 
-    json_data = []
-    # TODO better check if file exists or something else
-    try:
-        with open(f"./tests/{test_id}.json", "r+") as f:
-             json_data = json.load(f)
-    except FileNotFoundError:
-        pass
+    f = open(f"./tests/{test_id}.txt", "a")
 
     for i in range(times):
         print(f"Progress {i+1} out of {times}")
@@ -138,18 +132,15 @@ def main():
             soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
             question = soup.get_text()
 
-            a = {
-                "question": question.replace('\n', ''),
-                "answer": answers[i][0].strip()
-            }
-            json_data.append(a)
+            a = "question: " + question.replace("\n", "") + "\n"
+            a += "answer: " + answers[i][0].strip() + "\n\n";
+            f.write(a)
 
 
         # in r.text you have the whole html page
         # do whatever you want with it
         #test_results.write(r.text)
-    with open(f"./tests/{test_id}.json", "w") as f:
-        json.dump(json_data, f)
+    f.close()
 
 
 
