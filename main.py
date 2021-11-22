@@ -105,6 +105,7 @@ def main():
     test_id = sys.argv[3]
     times = int(sys.argv[4])
     s = VnsSession(login, password)
+
     print("test")
     if times == -1:
         r = s.test_start(test_id)
@@ -136,7 +137,6 @@ def main():
             a = "question: " + question.replace("\n", "") + "\n"
             a += "answer: " + answers[i][0].strip() + "\n\n";
             f.write(a)
-
 
         # in r.text you have the whole html page
         # do whatever you want with it
