@@ -100,48 +100,74 @@ class VnsSession:
         return self.get(self.url_test_review, payload)
 
 def main():
-    login = sys.argv[1]
-    password = sys.argv[2]
-    test_id = sys.argv[3]
-    times = int(sys.argv[4])
-    s = VnsSession(login, password)
+    test = False
+    for test_param in sys.argv:
+        if test_param == "--testing":
+            test = True
+            test_id = "testing_id"
+    if test == False:
+        login = sys.argv[1]
+        password = sys.argv[2]
+        test_id = sys.argv[3]
+        times = int(sys.argv[4])
 
-    print("test")
-    if times == -1:
-        r = s.test_start(test_id)
-        questions_raw = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
-        questions = []
-        for i in range(len(questions_raw)):
-            soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
-            question = soup.get_text()
-            questions.append(question)
+    if test == False:
+        s = VnsSession(login, password)
+        print("test")
+        if times == -1:
+            r = s.test_start(test_id)
+            questions_raw = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
+            questions = []
+            for i in range(len(questions_raw)):
+                soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
+                question = soup.get_text()
+                questions.append(question)
 
-        exit(0)
+            exit(0)
 
 
-    subprocess.run("mkdir -p tests", shell=True)
+        subprocess.run("mkdir -p tests", shell=True)
 
-    f = open(f"./tests/{test_id}.txt", "a")
+        f = open(f"./tests/{test_id}.txt", "a")
+    else:
+        f = open(f"./testing_folder/{test_id}.txt", "w")
+
+    if test == True:
+        f0 = open(f"./testing_folder/test_file.html", "r")
+        times = 1;
 
     for i in range(times):
         print(f"Progress {i+1} out of {times}")
-        s.test_start(test_id)
-        s.test_process()
-        r = s.test_review()
-        questions = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
-        answers = re.findall(r"Правильна відповідь: (.+?)", r.text)
+        if test == False:
+            s.test_start(test_id)
+            s.test_process()
+            r = s.test_review()
+            questions = re.findall(r"Текст питання<.+?>((.).*)</div><div", r.text)
+            answers = re.findall(r"Правильна відповідь: (.?[0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F])", r.text)
+        else:
+            r = f0.read()
+            questions = re.findall(r"Текст питання<.+?>((.).*)</div><div", r)
+            answers = re.findall(r"Правильна відповідь: (.?[0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F])", r)
+            f0.close()
+
         for i in range(len(questions)):
             soup = BeautifulSoup(questions[i][0].strip(), features="html.parser")
             question = soup.get_text()
-
+            question = question.replace("Виберіть одну відповідь:", "")
             a = "question: " + question.replace("\n", "") + "\n"
-            a += "answer: " + answers[i][0].strip() + "\n\n";
+            a += "answer: " + answers[i] + "\n\n"
+            if test == True:
+                print(a)
             f.write(a)
 
-        # in r.text you have the whole html page
-        # do whatever you want with it
-        #test_results.write(r.text)
+
+            # in r.text you have the whole html page
+            # do whatever you want with it
+            #test_results.write(r.text)
     f.close()
+
+
+
 
 
 
